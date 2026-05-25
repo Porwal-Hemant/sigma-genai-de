@@ -1,0 +1,139 @@
+version: 2
+
+mart_fact_transactions:
+  description: "Mart for aggregated transaction data with merchant and customer details"
+  columns:
+    - name: transaction_id
+      description: "Unique identifier for each transaction"
+      tests:
+        - not_null
+        - unique
+    - name: amount
+      description: "Transaction amount in USD"
+      tests:
+        - not_null
+    - name: status
+      description: "Transaction status (COMPLETED, FAILED, PENDING)"
+      tests:
+        - accepted_values:
+            values: ['COMPLETED', 'FAILED', 'PENDING']
+        - not_null
+    - name: merchant_id
+      description: "Foreign key to dim_merchant"
+      tests:
+        - not_null
+        - relationships:
+            to: ref('dim_merchant')
+            field: merchant_id
+    - name: customer_id
+      description: "Foreign key to dim_customer"
+      tests:
+        - not_null
+        - relationships:
+            to: ref('dim_customer')
+            field: customer_id
+    - name: transaction_date
+      description: "Date of the transaction"
+      tests:
+        - not_null
+    - name: payment_method
+      description: "Payment method used (CREDIT_CARD, DEBIT_CARD, UPI)"
+      tests:
+        - accepted_values:
+            values: ['CREDIT_CARD', 'DEBIT_CARD', 'UPI']
+        - not_null
+    - name: total_revenue
+      description: "Total revenue from completed transactions"
+      tests:
+        - not_null
+        - generic_test:
+            function: "test_total_revenue_gte_zero"
+    - name: failure_rate_pct
+      description: "Failure rate of transactions"
+      tests:
+        - not_null
+        - generic_test:
+            function: "test_failure_rate_between_0_and_100"
+    - name: merchant_name
+      description: "Name of the merchant from dim_merchant"
+      tests:
+        - not_null
+  tests:
+    - generic_test:
+        function: "test_status_cancelled_should_fail"
+```
+
+```sql
+-- models/marts/mart_fact_transactions.sql
+
+WITH stg_fact_transactions AS (
+    SELECT * FROM {{ ref('stg_fact_transactions') }}
+),
+
+stg_dim_merchant AS (
+    SELECT * FROM {{ ref('stg_dim_merchant') }}
+),
+
+stg_dim_customer AS (
+    SELECT * FROM {{ ref('stg_dim_customer') }}
+),
+
+int_completed_transactions AS (
+    SELECT
+        transaction_id,
+        amount,
+        status,
+        merchant_id,
+        customer_id,
+        transaction_date,
+        payment_method
+    FROM stg_fact_transactions
+    WHERE status = 'COMPLETED'
+),
+
+int_failed_transactions AS (
+    SELECT
+        transaction_id,
+        amount,
+        status,
+        merchant_id,
+        customer_id,
+        transaction_date,
+        payment_method
+    FROM stg_fact_transactions
+    WHERE status = 'FAILED'
+),
+
+int_total_revenue AS (
+    SELECT
+        SUM(amount) AS total_revenue
+    FROM int_completed_transactions
+),
+
+int_failure_rate AS (
+    SELECT
+        COUNT(*) AS total_transactions,
+        COUNT(CASE WHEN status = 'FAILED' THEN 1 END) AS failed_transactions,
+        (COUNT(CASE WHEN status = 'FAILED' THEN 1 END) * 100.0 / COUNT(*)) AS failure_rate_pct
+    FROM stg_fact_transactions
+),
+
+final AS (
+    SELECT
+        ft.transaction_id,
+        ft.amount,
+        ft.status,
+        ft.merchant_id,
+        ft.customer_id,
+        ft.transaction_date,
+        ft.payment_method,
+        dm.merchant_name,
+        tr.total_revenue,
+        fr.failure_rate_pct
+    FROM stg_fact_transactions ft
+    JOIN stg_dim_merchant dm ON ft.merchant_id = dm.merchant_id
+    CROSS JOIN int_total_revenue tr
+    CROSS JOIN int_failure_rate fr
+)
+
+SELECT * FROM final

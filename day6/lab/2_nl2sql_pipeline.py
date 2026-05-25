@@ -33,12 +33,18 @@ import json
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+from dotenv import load_dotenv
 from sample_data import SCHEMA_RICH, NL2SQL_QUESTIONS, SNOWFLAKE_CONFIG_TEMPLATE
 
 # ── CONFIGURATION ──────────────────────────────────────────
-bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / "aws_credentials.env")
+
+AWS_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+bedrock = boto3.client('bedrock-runtime', region_name=AWS_REGION)
 MODEL_ID = 'amazon.nova-pro-v1:0'  # Pro for better SQL reasoning
 
 # Schema context with business rules and few-shot examples
@@ -174,7 +180,7 @@ def execute_sql(sql: str) -> dict:
         cfg = SNOWFLAKE_CONFIG.copy()
         key_path = cfg.pop("private_key_path", None)
         if key_path:
-            abs_key_path = os.path.join(os.path.dirname(__file__), key_path)
+            abs_key_path = (Path(__file__).resolve().parent / key_path).resolve()
             with open(abs_key_path, 'rb') as f:
                 private_key = serialization.load_pem_private_key(f.read(), password=None, backend=default_backend())
             cfg["private_key"] = private_key.private_bytes(

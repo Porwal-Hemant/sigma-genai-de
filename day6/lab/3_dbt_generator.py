@@ -36,10 +36,16 @@ GENERATES:
 
 import boto3
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from sample_data import SCHEMA_COMPACT
 
 # ── CONFIGURATION ──────────────────────────────────────────
-bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / "aws_credentials.env")
+
+AWS_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+bedrock = boto3.client('bedrock-runtime', region_name=AWS_REGION)
 MODEL_ID = 'amazon.nova-pro-v1:0'
 
 
