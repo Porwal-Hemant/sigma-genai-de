@@ -1,49 +1,46 @@
-WITH filtered_transactions AS (
-    SELECT
-        transaction_id,
-        amount,
-        status,
-        merchant_id,
-        customer_id,
-        transaction_date,
-        payment_method
-    FROM {{ ref('stg_fact_transactions') }}
-    WHERE status IN ('COMPLETED', 'FAILED')
+WITH transactions AS (
+    SELECT * FROM {{ ref('stg_transactions') }}
 ),
 
-merchant_details AS (
+merchants AS (
     SELECT
-        merchant_id,
-        merchant_name,
-        category,
-        city,
-        onboarded_date
-    FROM {{ ref('dim_merchant') }}
+        MERCHANT_ID AS merchant_id,
+        MERCHANT_NAME AS merchant_name,
+        CATEGORY AS category,
+        CITY AS city
+    FROM {{ source('sigma_de', 'dim_merchant') }}
 ),
 
-aggregated_metrics AS (
+merchant_metrics AS (
     SELECT
-        ft.merchant_id,
+        t.merchant_id,
         m.merchant_name,
-        COUNT(ft.transaction_id) AS total_transactions,
-        COUNT(CASE WHEN ft.status = 'COMPLETED' THEN 1 END) AS completed_transactions,
-        COUNT(CASE WHEN ft.status = 'FAILED' THEN 1 END) AS failed_count,
-        SUM(CASE WHEN ft.status = 'COMPLETED' THEN ft.amount ELSE 0 END) AS total_revenue,
-        AVG(CASE WHEN ft.status = 'COMPLETED' THEN ft.amount ELSE NULL END) AS avg_transaction_value,
-        COUNT(DISTINCT ft.customer_id) AS unique_customers
-    FROM filtered_transactions ft
-    JOIN merchant_details m ON ft.merchant_id = m.merchant_id
-    GROUP BY ft.merchant_id, m.merchant_name
+        m.category,
+        m.city,
+        SUM(CASE WHEN t.status = 'COMPLETED' THEN t.amount ELSE 0 END) AS total_revenue,
+        COUNT(*) AS total_transactions,
+        SUM(CASE WHEN t.status = 'FAILED' THEN 1 ELSE 0 END) AS failed_count,
+        COUNT(DISTINCT t.customer_id) AS unique_customers,
+        AVG(CASE WHEN t.status = 'COMPLETED' THEN t.amount END) AS avg_transaction_value
+    FROM transactions t
+    JOIN merchants m
+        ON t.merchant_id = m.merchant_id
+    GROUP BY
+        t.merchant_id,
+        m.merchant_name,
+        m.category,
+        m.city
 )
 
 SELECT
     merchant_id,
     merchant_name,
-    total_transactions,
-    completed_transactions,
-    failed_count,
+    category,
+    city,
     total_revenue,
+    total_transactions,
+    failed_count,
+    ROUND((failed_count * 100.0) / NULLIF(total_transactions, 0), 2) AS failure_rate_pct,
     avg_transaction_value,
-    unique_customers,
-    (failed_count::FLOAT / total_transactions) * 100 AS failure_rate_pct
-FROM aggregated_metrics
+    unique_customers
+FROM merchant_metrics

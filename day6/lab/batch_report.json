@@ -1,0 +1,140 @@
+{
+  "directory": "queries",
+  "reviewed_at": "2026-05-25T18:38:46.959336",
+  "files_reviewed": 4,
+  "total_issues": 11,
+  "files": [
+    {
+      "file": "queries/customer_spend.sql",
+      "reviewed_at": "2026-05-25T18:38:27.212237",
+      "issues_found": 3,
+      "review": {
+        "issues": [
+          {
+            "severity": "Critical",
+            "category": "Correctness",
+            "title": "Incorrect lifetime_value calculation",
+            "line": "SUM(t.amount) as lifetime_value",
+            "problem": "The query calculates the lifetime value for customers but does not filter by transaction status 'COMPLETED'.",
+            "fix": "SUM(CASE WHEN t.status = 'COMPLETED' THEN t.amount ELSE 0 END) as lifetime_value"
+          },
+          {
+            "severity": "Medium",
+            "category": "Correctness",
+            "title": "Missing filter for total_orders",
+            "line": "COUNT(t.transaction_id) as total_orders",
+            "problem": "The query counts all transactions without filtering by status 'COMPLETED'.",
+            "fix": "COUNT(CASE WHEN t.status = 'COMPLETED' THEN t.transaction_id ELSE NULL END) as total_orders"
+          },
+          {
+            "severity": "Low",
+            "category": "Readability",
+            "title": "Lack of comments",
+            "line": "N/A",
+            "problem": "The query lacks comments explaining the logic, which could be helpful for future maintainers.",
+            "fix": "Add comments to explain the purpose of each part of the query."
+          }
+        ],
+        "corrected_sql": "SELECT c.customer_name, c.email, c.tier, SUM(CASE WHEN t.status = 'COMPLETED' THEN t.amount ELSE 0 END) as lifetime_value, COUNT(CASE WHEN t.status = 'COMPLETED' THEN t.transaction_id ELSE NULL END) as total_orders FROM dim_customer c LEFT JOIN fact_transactions t ON c.customer_id = t.customer_id WHERE t.status = 'COMPLETED' GROUP BY c.customer_name, c.email HAVING SUM(CASE WHEN t.status = 'COMPLETED' THEN t.amount ELSE 0 END) > 1000 ORDER BY lifetime_value DESC;",
+        "summary": "The query had issues with calculating lifetime value and total orders correctly. It also lacked comments for readability."
+      }
+    },
+    {
+      "file": "queries/daily_failure_rate.sql",
+      "reviewed_at": "2026-05-25T18:38:35.054652",
+      "issues_found": 3,
+      "review": {
+        "issues": [
+          {
+            "severity": "Critical",
+            "category": "Correctness",
+            "title": "Incorrect calculation of failure rate",
+            "line": "failed_count / total_count * 100 as failure_rate",
+            "problem": "The failure rate is being calculated incorrectly because failed_count is not defined in the SELECT clause but used in the calculation.",
+            "fix": "Use a subquery or a CASE statement to calculate the failure rate."
+          },
+          {
+            "severity": "Medium",
+            "category": "Performance",
+            "title": "Potential performance issue with correlated subquery",
+            "line": "SELECT COUNT(*) FROM fact_transactions f2 WHERE f2.status = 'FAILED' AND f2.transaction_date = t.transaction_date",
+            "problem": "The correlated subquery can be inefficient as it runs for each row in the outer query.",
+            "fix": "Use a JOIN or a derived table to calculate the failed_count."
+          },
+          {
+            "severity": "Low",
+            "category": "Readability",
+            "title": "Lack of comments on complex logic",
+            "line": "entire query",
+            "problem": "The query lacks comments explaining the logic, making it harder to understand.",
+            "fix": "Add comments to explain the logic of the query."
+          }
+        ],
+        "corrected_sql": "WITH failed_transactions AS (\n  SELECT transaction_date, COUNT(*) as failed_count\n  FROM fact_transactions\n  WHERE status = 'FAILED'\n  GROUP BY transaction_date\n)\nSELECT t.transaction_date,\n       COALESCE(ft.failed_count, 0) as failed_count,\n       COUNT(*) as total_count,\n       COALESCE(ft.failed_count, 0) * 100.0 / COUNT(*) as failure_rate\nFROM fact_transactions t\nLEFT JOIN failed_transactions ft ON t.transaction_date = ft.transaction_date\nGROUP BY t.transaction_date, COALESCE(ft.failed_count, 0)\nORDER BY t.transaction_date;",
+        "summary": "The query had a critical correctness issue with the failure rate calculation and a performance issue with the correlated subquery. Additionally, it lacked comments for readability."
+      }
+    },
+    {
+      "file": "queries/my_query.sql",
+      "reviewed_at": "2026-05-25T18:38:40.006161",
+      "issues_found": 2,
+      "review": {
+        "issues": [
+          {
+            "severity": "Critical",
+            "category": "Correctness",
+            "title": "Incorrect revenue calculation",
+            "line": "SUM(t.amount) as category_revenue",
+            "problem": "Revenue should only include completed transactions, but all transactions are summed.",
+            "fix": "SUM(CASE WHEN t.status = 'COMPLETED' THEN t.amount ELSE 0 END) as category_revenue"
+          },
+          {
+            "severity": "Medium",
+            "category": "Readability",
+            "title": "Missing comments",
+            "line": "Entire query",
+            "problem": "The query lacks comments explaining the logic and purpose of each clause.",
+            "fix": "Add comments to explain each part of the query."
+          }
+        ],
+        "corrected_sql": "SELECT m.category, t.customer_id, SUM(CASE WHEN t.status = 'COMPLETED' THEN t.amount ELSE 0 END) as category_revenue, COUNT(*) as transaction_count FROM fact_transactions t JOIN dim_merchant m ON t.merchant_id = m.merchant_id WHERE t.transaction_date >= '2024-01-01' GROUP BY m.category ORDER BY category_revenue ASC;",
+        "summary": "The query had a critical correctness issue with revenue calculation and lacked readability due to missing comments."
+      }
+    },
+    {
+      "file": "queries/revenue_by_merchant.sql",
+      "reviewed_at": "2026-05-25T18:38:46.957117",
+      "issues_found": 3,
+      "review": {
+        "issues": [
+          {
+            "severity": "Critical",
+            "category": "Correctness",
+            "title": "Incorrect Revenue Calculation",
+            "line": "SUM(t.amount) as total_revenue",
+            "problem": "Revenue should only include transactions with status 'COMPLETED'.",
+            "fix": "SUM(CASE WHEN t.status = 'COMPLETED' THEN t.amount ELSE 0 END) as total_revenue"
+          },
+          {
+            "severity": "Medium",
+            "category": "Performance",
+            "title": "Potential Performance Issue",
+            "line": "FROM fact_transactions t, dim_merchant m",
+            "problem": "Using implicit join syntax can lead to less readable and potentially slower queries.",
+            "fix": "FROM fact_transactions t JOIN dim_merchant m ON t.merchant_id = m.merchant_id"
+          },
+          {
+            "severity": "Low",
+            "category": "Readability",
+            "title": "Lack of Comments",
+            "line": "Entire Query",
+            "problem": "The query lacks comments explaining the logic, which can make it harder to understand for other developers.",
+            "fix": "Add comments explaining the purpose of each part of the query."
+          }
+        ],
+        "corrected_sql": "SELECT m.merchant_name,\n       SUM(CASE WHEN t.status = 'COMPLETED' THEN t.amount ELSE 0 END) as total_revenue,\n       COUNT(*) as txn_count\nFROM fact_transactions t JOIN dim_merchant m ON t.merchant_id = m.merchant_id\nWHERE t.transaction_date > '2024-01-01'\nGROUP BY m.merchant_name\nORDER BY total_revenue DESC\nLIMIT 10;",
+        "summary": "The query has a critical correctness issue with revenue calculation and a readability issue with lack of comments. It also uses an implicit join which could be replaced with an explicit join for better readability and potentially better performance."
+      }
+    }
+  ]
+}

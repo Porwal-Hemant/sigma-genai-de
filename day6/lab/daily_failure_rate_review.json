@@ -1,0 +1,35 @@
+{
+  "file": "queries/daily_failure_rate.sql",
+  "reviewed_at": "2026-05-25T18:38:35.054652",
+  "issues_found": 3,
+  "review": {
+    "issues": [
+      {
+        "severity": "Critical",
+        "category": "Correctness",
+        "title": "Incorrect calculation of failure rate",
+        "line": "failed_count / total_count * 100 as failure_rate",
+        "problem": "The failure rate is being calculated incorrectly because failed_count is not defined in the SELECT clause but used in the calculation.",
+        "fix": "Use a subquery or a CASE statement to calculate the failure rate."
+      },
+      {
+        "severity": "Medium",
+        "category": "Performance",
+        "title": "Potential performance issue with correlated subquery",
+        "line": "SELECT COUNT(*) FROM fact_transactions f2 WHERE f2.status = 'FAILED' AND f2.transaction_date = t.transaction_date",
+        "problem": "The correlated subquery can be inefficient as it runs for each row in the outer query.",
+        "fix": "Use a JOIN or a derived table to calculate the failed_count."
+      },
+      {
+        "severity": "Low",
+        "category": "Readability",
+        "title": "Lack of comments on complex logic",
+        "line": "entire query",
+        "problem": "The query lacks comments explaining the logic, making it harder to understand.",
+        "fix": "Add comments to explain the logic of the query."
+      }
+    ],
+    "corrected_sql": "WITH failed_transactions AS (\n  SELECT transaction_date, COUNT(*) as failed_count\n  FROM fact_transactions\n  WHERE status = 'FAILED'\n  GROUP BY transaction_date\n)\nSELECT t.transaction_date,\n       COALESCE(ft.failed_count, 0) as failed_count,\n       COUNT(*) as total_count,\n       COALESCE(ft.failed_count, 0) * 100.0 / COUNT(*) as failure_rate\nFROM fact_transactions t\nLEFT JOIN failed_transactions ft ON t.transaction_date = ft.transaction_date\nGROUP BY t.transaction_date, COALESCE(ft.failed_count, 0)\nORDER BY t.transaction_date;",
+    "summary": "The query had a critical correctness issue with the failure rate calculation and a performance issue with the correlated subquery. Additionally, it lacked comments for readability."
+  }
+}
