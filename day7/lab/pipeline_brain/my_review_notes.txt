@@ -6,3 +6,5 @@ Fixes applied to pass the Day 7 code review checklist:
 4. Added schema validation before Bronze, Silver, merchant, and Gold transformations.
 5. Added NULL checks for transaction_id, merchant_id, customer_id, transaction_date, status, and amount.
 6. Preserved the existing pass items: overwrite writes, partition pruning, COMPLETED-only revenue, broadcast merchant join, transaction_id deduplication, run metadata output, and specific imports.
+
+Day 7 completed and validated.
