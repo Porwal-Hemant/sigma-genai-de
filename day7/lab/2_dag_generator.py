@@ -47,12 +47,20 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+from pathlib import Path
+from dotenv import load_dotenv
 from sample_data import PIPELINE_SPEC, DAG_CONFIG
 
 # ── CONFIGURATION ──────────────────────────────────────────────────────────
-bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
+LAB_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DAY7_ENV = PROJECT_ROOT / "day7" / "aws_credentials.env"
+load_dotenv(DAY7_ENV if DAY7_ENV.exists() else PROJECT_ROOT / "aws_credentials.env")
+
+AWS_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 MODEL_ID = "amazon.nova-lite-v1:0"     # DAG structure is formulaic — Lite handles it well
-OUTPUT_DIR = "pipeline_brain"
+OUTPUT_DIR = str(LAB_DIR / "pipeline_brain")
 
 # ── SYSTEM PROMPT ──────────────────────────────────────────────────────────
 # Key design decision: ask for PythonOperator (not BashOperator) because

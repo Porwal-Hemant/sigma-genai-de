@@ -1,0 +1,69 @@
+Build a daily batch PySpark pipeline using Medallion Architecture (Bronze → Silver → Gold) for SigmaPay payment transactions.
+
+Source Tables:
+1. transactions_raw (Parquet, ~5M rows/day)
+2. payment_fee_lookup (CSV/Delta, <10 rows)
+3. calendar_dim (Delta)
+
+Bronze Layer:
+- Read Parquet source with all columns as STRING
+- Add metadata columns:
+    ingestion_timestamp = current_timestamp()
+    source_file = input_file_name()
+    pipeline_run_id = uuid4()
+- Partition by ingestion_date (not transaction_date)
+- Fail fast if source file missing
+
+Silver Layer:
+- Cast:
+    amount -> DecimalType(18,4)
+    transaction_date -> DateType
+    transaction_id, merchant_id, customer_id -> StringType
+
+Filters in order:
+1. Drop NULL transaction_id
+2. Drop amount <= 0
+3. Keep only transaction_date = run_date - 1
+
+Deduplication:
+- Dedup key = transaction_id
+- Keep latest ingestion_timestamp
+
+Quality Rule:
+- If null transaction_id rate > 5%, raise exception and stop pipeline
+
+Partition Silver by transaction_date.
+
+Gold Layer:
+Table Name: fee_analysis
+
+Fee Rates:
+- CREDIT_CARD -> 0.02
+- DEBIT_CARD -> 0.015
+- UPI -> 0.00
+
+Business Logic:
+gross_revenue = SUM(amount) WHERE status = 'COMPLETED'
+
+txn_volume_by_payment_method =
+COUNT(*) GROUP BY payment_method
+
+fee_amount =
+gross_revenue * fee_rate
+
+effective_revenue =
+gross_revenue * (1 - fee_rate)
+
+Key Columns:
+- analysis_date
+- payment_method
+
+Special Rules:
+- Unknown payment_method -> fee_rate = 0.0
+- Log warning, never drop revenue
+
+Performance Optimizations:
+- Broadcast fee lookup DataFrame
+- Partition pruning on transaction_date
+- Gold partitioned by analysis_date
+- No caching required (linear DAG)

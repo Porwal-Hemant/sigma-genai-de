@@ -57,12 +57,20 @@ import boto3
 import json
 import os
 from datetime import datetime, timezone
+from pathlib import Path
+from dotenv import load_dotenv
 from sample_data import SCHEMA_BRONZE, SCHEMA_SILVER
 
 # ── CONFIGURATION ──────────────────────────────────────────────────────────
-bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
+LAB_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DAY7_ENV = PROJECT_ROOT / "day7" / "aws_credentials.env"
+load_dotenv(DAY7_ENV if DAY7_ENV.exists() else PROJECT_ROOT / "aws_credentials.env")
+
+AWS_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 MODEL_ID = "amazon.nova-lite-v1:0"
-OUTPUT_DIR = "pipeline_brain"
+OUTPUT_DIR = str(LAB_DIR / "pipeline_brain")
 
 # ── SCHEMA DRIFT SIMULATION ────────────────────────────────────────────────
 # These are the new columns that appeared in the upstream CSV without warning.
@@ -71,6 +79,7 @@ OUTPUT_DIR = "pipeline_brain"
 DRIFTED_COLUMNS = {
     "payment_gateway":  "string",    # new: which payment processor handled the txn
     "discount_amount":  "float",     # new: discount applied at checkout
+    "refund_flag":      "boolean",   # new: whether the transaction was refunded
 }
 
 # ── SYSTEM PROMPT ──────────────────────────────────────────────────────────

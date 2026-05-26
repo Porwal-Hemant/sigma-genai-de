@@ -1,0 +1,14 @@
+{
+  "model": "amazon.nova-lite-v1:0",
+  "dag_id": "sigma_transaction_pipeline",
+  "schedule": "0 2 * * *",
+  "tasks_found": 3,
+  "has_dependencies": true,
+  "has_failure_callback": true,
+  "has_sla": true,
+  "tokens_in": 1259,
+  "tokens_out": 853,
+  "output_file": "/Users/as-mac-1213/Documents/genAI_practice/sigma-genai-de/day7/lab/pipeline_brain/sigma_dag.py",
+  "output_bytes": 2961,
+  "generated_at": "2026-05-26T09:24:04.778100+00:00"
+}

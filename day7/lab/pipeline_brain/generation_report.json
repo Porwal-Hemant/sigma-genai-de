@@ -1,0 +1,18 @@
+{
+  "model": "amazon.nova-lite-v1:0",
+  "strategy": "two_phase",
+  "spec_chars": 1651,
+  "bronze_silver_tokens": {
+    "input": 844,
+    "output": 1025
+  },
+  "gold_tokens": {
+    "input": 922,
+    "output": 1036
+  },
+  "total_tokens_in": 1766,
+  "total_tokens_out": 2061,
+  "output_file": "/Users/as-mac-1213/Documents/genAI_practice/sigma-genai-de/day7/lab/pipeline_brain/generated_pipeline.py",
+  "output_bytes": 8812,
+  "generated_at": "2026-05-26T09:00:26.876063+00:00"
+}
