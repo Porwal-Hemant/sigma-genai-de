@@ -55,6 +55,8 @@ import sys
 import os
 import json
 from datetime import datetime
+from pathlib import Path
+from dotenv import load_dotenv
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -95,13 +97,18 @@ except ImportError:
     print("  Running in FALLBACK MODE — DuckDB SQL checks instead of HTML reports.")
     print()
 
-# ── Configuration ──────────────────────────────────────────────────────────────
+# ── Environment + configuration ────────────────────────────────────────────────
+LAB_DIR        = Path(__file__).resolve().parent
+PROJECT_ROOT  = LAB_DIR.parents[1]
+DAY8_ENV      = PROJECT_ROOT / "day8" / "aws_credentials.env"
+ROOT_ENV      = PROJECT_ROOT / "aws_credentials.env"
+load_dotenv(DAY8_ENV if DAY8_ENV.exists() else ROOT_ENV)
+
 MODEL_ID_LITE  = "amazon.nova-lite-v1:0"
-REGION         = "us-east-1"
-LAB_DIR        = os.path.dirname(os.path.abspath(__file__))
-DB_PATH        = os.path.join(LAB_DIR, "sigma_platform.duckdb")
-OUTPUT_DIR     = os.path.join(LAB_DIR, "devops_brain")
-OBS_DIR        = os.path.join(OUTPUT_DIR, "observability")
+REGION         = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+DB_PATH        = str(LAB_DIR / "sigma_platform.duckdb")
+OUTPUT_DIR     = str(LAB_DIR / "devops_brain")
+OBS_DIR        = str(Path(OUTPUT_DIR) / "observability")
 os.makedirs(OBS_DIR, exist_ok=True)
 
 bedrock = boto3.client("bedrock-runtime", region_name=REGION)

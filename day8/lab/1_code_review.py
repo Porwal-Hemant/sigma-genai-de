@@ -37,20 +37,27 @@ import os
 import json
 import re
 import boto3
+from pathlib import Path
+from dotenv import load_dotenv
 
 # Windows UTF-8 stdout fix
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 
-# ── Model configuration ──────────────────────────────────────────────────────
+# ── Environment + model configuration ────────────────────────────────────────
+SCRIPT_DIR     = Path(__file__).resolve().parent
+PROJECT_ROOT   = SCRIPT_DIR.parents[1]
+DAY8_ENV       = PROJECT_ROOT / "day8" / "aws_credentials.env"
+ROOT_ENV       = PROJECT_ROOT / "aws_credentials.env"
+load_dotenv(DAY8_ENV if DAY8_ENV.exists() else ROOT_ENV)
+
 MODEL_ID_PRO  = "amazon.nova-pro-v1:0"   # heavier reasoning — code review
 MODEL_ID_LITE = "amazon.nova-lite-v1:0"  # faster — stack trace RCA
-REGION        = "us-east-1"
+REGION        = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-SCRIPT_DIR     = os.path.dirname(os.path.abspath(__file__))
-BUGGY_PIPELINE = os.path.join(SCRIPT_DIR, "buggy_pipeline.py")
-OUTPUT_DIR     = os.path.join(SCRIPT_DIR, "devops_brain")
+BUGGY_PIPELINE = str(SCRIPT_DIR / "buggy_pipeline.py")
+OUTPUT_DIR     = str(SCRIPT_DIR / "devops_brain")
 
 # ── Fake prod stack trace (hardcoded — pulled from CloudWatch) ───────────────
 PROD_STACK_TRACE = """\

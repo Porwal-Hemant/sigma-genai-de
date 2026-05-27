@@ -51,17 +51,25 @@ import os
 import json
 import boto3
 from datetime import datetime, timezone
+from pathlib import Path
+from dotenv import load_dotenv
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# ── Configuration ──────────────────────────────────────────────────────────
+# ── Environment + configuration ────────────────────────────────────────────
+SCRIPT_DIR   = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parents[1]
+DAY8_ENV     = PROJECT_ROOT / "day8" / "aws_credentials.env"
+ROOT_ENV     = PROJECT_ROOT / "aws_credentials.env"
+load_dotenv(DAY8_ENV if DAY8_ENV.exists() else ROOT_ENV)
+
 MODEL_ID_PRO  = "amazon.nova-pro-v1:0"
 MODEL_ID_LITE = "amazon.nova-lite-v1:0"
-REGION        = "us-east-1"
+REGION        = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 
-OUTPUT_DIR   = os.path.join(os.path.dirname(__file__), "devops_brain")
-SOURCE_FILE  = os.path.join(os.path.dirname(__file__), "buggy_pipeline.py")
+OUTPUT_DIR   = str(SCRIPT_DIR / "devops_brain")
+SOURCE_FILE  = str(SCRIPT_DIR / "buggy_pipeline.py")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

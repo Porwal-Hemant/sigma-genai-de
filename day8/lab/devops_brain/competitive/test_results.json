@@ -1,0 +1,11 @@
+{
+  "check": "testing",
+  "test_file": "/Users/as-mac-1213/Documents/genAI_practice/sigma-genai-de/day8/lab/devops_brain/competitive/test_challenge_pipeline.py",
+  "tests_ran": 3,
+  "passed": 2,
+  "failed": 1,
+  "errors": 0,
+  "pass_threshold": 2,
+  "check_passed": true,
+  "pytest_output": "============================= test session starts ==============================\ncollected 3 items\n\ndevops_brain/competitive/test_challenge_pipeline.py F..                  [100%]\n\n=================================== FAILURES ===================================\n___________________ test_filter_recent_transactions_boundary ___________________\ndevops_brain/competitive/test_challenge_pipeline.py:19: in test_filter_recent_transactions_boundary\n    assert len(result) == 2\nE   AssertionError: assert 1 == 2\nE    +  where 1 = len([{'amount': 300, 'date': datetime.datetime(2026, 5, 28, 18, 26, 10, 744925)}])\n=========================== short test summary info ============================\nFAILED devops_brain/competitive/test_challenge_pipeline.py::test_filter_recent_transactions_boundary\n========================= 1 failed, 2 passed in 0.03s ==========================\n"
+}

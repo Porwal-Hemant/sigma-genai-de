@@ -38,6 +38,8 @@ import re
 import subprocess
 import tempfile
 from datetime import datetime
+from pathlib import Path
+from dotenv import load_dotenv
 
 # Windows UTF-8 stdout fix
 if sys.platform == "win32":
@@ -49,13 +51,18 @@ except ImportError:
     print("[ERROR] boto3 not installed. Run: pip install boto3")
     sys.exit(1)
 
-# ── Model / region ────────────────────────────────────────────────────────────
+# ── Environment / model / region ──────────────────────────────────────────────
+SCRIPT_DIR       = Path(__file__).resolve().parent
+PROJECT_ROOT     = SCRIPT_DIR.parents[1]
+DAY8_ENV         = PROJECT_ROOT / "day8" / "aws_credentials.env"
+ROOT_ENV         = PROJECT_ROOT / "aws_credentials.env"
+load_dotenv(DAY8_ENV if DAY8_ENV.exists() else ROOT_ENV)
+
 MODEL_ID_LITE = "amazon.nova-lite-v1:0"
-REGION        = "us-east-1"
+REGION        = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-SCRIPT_DIR       = os.path.dirname(os.path.abspath(__file__))
-DEVOPS_BRAIN_DIR = os.path.join(SCRIPT_DIR, "devops_brain")
+DEVOPS_BRAIN_DIR = str(SCRIPT_DIR / "devops_brain")
 COMPETITIVE_DIR  = os.path.join(DEVOPS_BRAIN_DIR, "competitive")
 CHALLENGE_PATH   = os.path.join(DEVOPS_BRAIN_DIR, "challenge_pipeline.py")
 
@@ -482,11 +489,15 @@ into the test file so it runs without any imports from challenge_pipeline.
         )
         output = proc.stdout + proc.stderr
 
-        # Count tests that were collected and ran (passed or failed — not errors)
-        passed_count = output.count(" passed") + output.count(" PASSED")
-        failed_count = output.count(" failed") + output.count(" FAILED")
-        error_count  = output.count(" error")
-        ran          = passed_count + failed_count
+        summary_passed = re.search(r"(\d+)\s+passed", output)
+        summary_failed = re.search(r"(\d+)\s+failed", output)
+        summary_errors = re.search(r"(\d+)\s+errors?", output)
+        collected = re.search(r"collected\s+(\d+)\s+items?", output)
+
+        passed_count = int(summary_passed.group(1)) if summary_passed else 0
+        failed_count = int(summary_failed.group(1)) if summary_failed else 0
+        error_count  = int(summary_errors.group(1)) if summary_errors else 0
+        ran          = int(collected.group(1)) if collected else passed_count + failed_count
 
         passed = ran >= 2
 
@@ -673,7 +684,7 @@ def print_scorecard(checks: list) -> int:
     print("=" * 68)
 
     for i, (label, check) in enumerate(zip(labels, checks)):
-        passed = check.get("passed") or check.get("check_passed", False)
+        passed = check.get("check_passed") if "check_passed" in check else check.get("passed", False)
         mark   = green("PASS ✓") if passed else red("FAIL ✗")
         print(f"  [{mark}]  {label}")
         if passed:
@@ -690,7 +701,8 @@ def print_scorecard(checks: list) -> int:
         print(f"\n  {yellow(bold('CONDITIONAL SHIP'))}  Fix the red items above before merging.")
     else:
         verdict = "DOESN'T SHIP"
-        print(f"\n  {red(bold('DOESN\'T SHIP ✗'))}  Too many failures. This PR is not ready.")
+        verdict_label = red(bold("DOESN'T SHIP ✗"))
+        print(f"\n  {verdict_label}  Too many failures. This PR is not ready.")
 
     print("=" * 68)
     return score, verdict
