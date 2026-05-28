@@ -1,0 +1,21 @@
+{
+  "team": "team7_schema_archaeologist",
+  "generated_at": "2026-05-28T15:43:39",
+  "verdict": "DO NOT MIGRATE AS WRITTEN",
+  "dangerous_step": "v2_to_v3 drops payment_method",
+  "risk_rating": "CRITICAL",
+  "why_it_is_silent": "A compatibility view can add payment_method as NULL, allowing downstream UPI filters to run and return zero rows instead of failing.",
+  "proof": {
+    "v2_upi_transactions": 3,
+    "v2_upi_revenue": 875.5,
+    "v3_compat_upi_transactions": 0,
+    "v3_compat_upi_revenue": 0.0
+  },
+  "downstream_query_that_breaks": "SELECT COUNT(*), SUM(amount) FROM txn_current WHERE payment_method = 'UPI';",
+  "safer_migration": [
+    "Keep payment_method in v3 until every downstream report is migrated.",
+    "If a rename is required, create a compatibility view that maps customer_id to user_id but preserves payment_method.",
+    "Add CI checks comparing channel-level counts and revenue between v2 and v3 before cutover."
+  ],
+  "what_ai_got_wrong": "The AI auditor may label the dropped column as medium schema cleanup, but business evidence shows it destroys payment-channel reporting."
+}
