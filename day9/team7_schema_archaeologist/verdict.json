@@ -1,6 +1,6 @@
 {
   "team": "team7_schema_archaeologist",
-  "generated_at": "2026-05-28T15:43:39",
+  "generated_at": "2026-05-28T16:06:46",
   "verdict": "DO NOT MIGRATE AS WRITTEN",
   "dangerous_step": "v2_to_v3 drops payment_method",
   "risk_rating": "CRITICAL",
@@ -13,6 +13,7 @@
   },
   "downstream_query_that_breaks": "SELECT COUNT(*), SUM(amount) FROM txn_current WHERE payment_method = 'UPI';",
   "safer_migration": [
+    "Create txn_v3_proposed with transaction_id as the primary key, and move payment_method into txn_payment_methods keyed by transaction_id.",
     "Keep payment_method in v3 until every downstream report is migrated.",
     "If a rename is required, create a compatibility view that maps customer_id to user_id but preserves payment_method.",
     "Add CI checks comparing channel-level counts and revenue between v2 and v3 before cutover."

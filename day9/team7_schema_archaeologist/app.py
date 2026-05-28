@@ -18,6 +18,41 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(APP_DIR, "..", "shared", "sigma_platform.duckdb")
 VERDICT_PATH = os.path.join(APP_DIR, "verdict.json")
 
+PROPOSED_SOLUTION_SCHEMA = """
+CREATE TABLE IF NOT EXISTS txn_v3_proposed (
+    transaction_id   VARCHAR PRIMARY KEY,
+    amount           DOUBLE NOT NULL,
+    status           VARCHAR NOT NULL,
+    merchant_id      VARCHAR,
+    user_id          VARCHAR,
+    transaction_date DATE
+);
+
+CREATE TABLE IF NOT EXISTS txn_payment_methods (
+    transaction_id VARCHAR PRIMARY KEY,
+    payment_method VARCHAR,
+    FOREIGN KEY (transaction_id) REFERENCES txn_v3_proposed(transaction_id)
+);
+"""
+
+PROPOSED_SOLUTION_SQL = """
+CREATE TABLE txn_v3_proposed AS
+SELECT
+    transaction_id,
+    amount,
+    status,
+    merchant_id,
+    customer_id AS user_id,
+    transaction_date
+FROM txn_v2;
+
+CREATE TABLE txn_payment_methods AS
+SELECT
+    transaction_id,
+    payment_method
+FROM txn_v2;
+"""
+
 
 st.set_page_config(page_title="Schema Archaeologist", layout="wide")
 
@@ -147,6 +182,7 @@ def build_verdict() -> dict:
         },
         "downstream_query_that_breaks": "SELECT COUNT(*), SUM(amount) FROM txn_current WHERE payment_method = 'UPI';",
         "safer_migration": [
+            "Create txn_v3_proposed with transaction_id as the primary key, and move payment_method into txn_payment_methods keyed by transaction_id.",
             "Keep payment_method in v3 until every downstream report is migrated.",
             "If a rename is required, create a compatibility view that maps customer_id to user_id but preserves payment_method.",
             "Add CI checks comparing channel-level counts and revenue between v2 and v3 before cutover.",
@@ -180,7 +216,7 @@ top[3].metric("Verdict", "Do Not Migrate")
 st.divider()
 
 st.subheader("Schema Timeline")
-schema_tabs = st.tabs(["v1", "v2", "v3", "Diffs"])
+schema_tabs = st.tabs(["v1", "v2", "v3", "Diffs", "Proposed Solution"])
 with schema_tabs[0]:
     st.code(SCHEMA_V1, language="sql")
     st.dataframe(schema_profile("txn_v1"), use_container_width=True, hide_index=True)
@@ -196,6 +232,24 @@ with schema_tabs[3]:
     c1.dataframe(schema_diff("txn_v1", "txn_v2"), use_container_width=True, hide_index=True)
     c2.markdown("**v2 to v3**")
     c2.dataframe(schema_diff("txn_v2", "txn_v3"), use_container_width=True, hide_index=True)
+with schema_tabs[4]:
+    st.markdown("**Corrected v3 design**")
+    st.code(PROPOSED_SOLUTION_SCHEMA, language="sql")
+    st.markdown("This proposed version keeps the stable primary key `transaction_id` in v3 and stores `payment_method` in a separate table keyed by `transaction_id`, so downstream UPI/card reports can join safely instead of silently breaking.")
+    st.code(PROPOSED_SOLUTION_SQL, language="sql")
+    proposed_cols = pd.DataFrame(
+        [
+            {"table_name": "txn_v3_proposed", "column_name": "transaction_id", "column_type": "VARCHAR", "purpose": "Stable transaction primary key"},
+            {"table_name": "txn_v3_proposed", "column_name": "amount", "column_type": "DOUBLE", "purpose": "Transaction amount"},
+            {"table_name": "txn_v3_proposed", "column_name": "status", "column_type": "VARCHAR", "purpose": "Payment lifecycle status"},
+            {"table_name": "txn_v3_proposed", "column_name": "merchant_id", "column_type": "VARCHAR", "purpose": "Merchant join key"},
+            {"table_name": "txn_v3_proposed", "column_name": "user_id", "column_type": "VARCHAR", "purpose": "Renamed customer identifier"},
+            {"table_name": "txn_v3_proposed", "column_name": "transaction_date", "column_type": "DATE", "purpose": "Reporting date"},
+            {"table_name": "txn_payment_methods", "column_name": "transaction_id", "column_type": "VARCHAR", "purpose": "Foreign key back to txn_v3_proposed"},
+            {"table_name": "txn_payment_methods", "column_name": "payment_method", "column_type": "VARCHAR", "purpose": "Required for UPI/card/debit-card reporting"},
+        ]
+    )
+    st.dataframe(proposed_cols, use_container_width=True, hide_index=True)
 
 st.subheader("Round 1 - AI Historian")
 historian_text = safe_ai_call(
@@ -260,14 +314,16 @@ st.subheader("Safer Migration")
 safe_sql = """
 CREATE VIEW txn_v3_compat AS
 SELECT
-    transaction_id,
-    amount,
-    status,
-    merchant_id,
-    customer_id AS user_id,
-    transaction_date,
-    payment_method
-FROM txn_v2;
+    v3.transaction_id,
+    v3.amount,
+    v3.status,
+    v3.merchant_id,
+    v3.user_id,
+    v3.transaction_date,
+    pm.payment_method
+FROM txn_v3_proposed v3
+LEFT JOIN txn_payment_methods pm
+    ON v3.transaction_id = pm.transaction_id;
 
 -- Cutover gate: must match before reports move to v3.
 SELECT payment_method, COUNT(*) AS txns, SUM(amount) AS revenue
@@ -276,8 +332,9 @@ GROUP BY payment_method;
 """
 st.code(safe_sql, language="sql")
 st.markdown(
-    "- Preserve `payment_method` until all downstream reports are migrated.\n"
-    "- Ship a compatibility view first, then deprecate the old table after report owners sign off.\n"
+    "- Keep `txn_v3_proposed` focused on core transaction facts.\n"
+    "- Store `payment_method` in `txn_payment_methods` with `transaction_id` as the foreign key.\n"
+    "- Ship a compatibility view first, then deprecate old report queries after report owners sign off.\n"
     "- Add CI checks for payment-channel counts and revenue before every migration."
 )
 
